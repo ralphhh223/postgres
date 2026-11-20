@@ -1,0 +1,62 @@
+PostgreSQL 16.14; GCC 14.4.0; Linux 6.18.58.1-microsoft-standard-WSL2; Docker --cap-add PERFMON
+
+BEGIN
+SET
+CREATE TABLE
+GRANT
+INSERT 0 9
+COMMIT
+SET
+SET
+SET
+SET
+SELECT 10000
+SELECT 15000
+ANALYZE
+ANALYZE
+ disabled
+----------
+    10000
+(1 row)
+
+SET
+SET
+psql:/build/contrib/halo_pmc/demo.sql:17: INFO:  halo_pmc: mode=read scope=hash_build_loop event=instructions raw=8979771 scaled=8979771 enabled_ns=1961272 running_ns=1961272
+psql:/build/contrib/halo_pmc/demo.sql:17: INFO:  halo_pmc: mode=read scope=hash_build_loop event=cycles raw=5269522 scaled=5269522 enabled_ns=1911878 running_ns=1911878
+psql:/build/contrib/halo_pmc/demo.sql:17: INFO:  halo_pmc: mode=read scope=hash_build_loop event=perf_count_hw_cache_l1d_rd raw=2923835 scaled=2923835 enabled_ns=1879127 running_ns=1879127
+psql:/build/contrib/halo_pmc/demo.sql:17: INFO:  halo_pmc: mode=read scope=hash_build_loop event=perf_count_hw_cache_l1d_miss_rd raw=29817 scaled=29817 enabled_ns=1874869 running_ns=1874869
+                             QUERY PLAN
+---------------------------------------------------------------------
+ Aggregate (actual rows=1 loops=1)
+   ->  Hash Join (actual rows=10000 loops=1)
+         Hash Cond: (pmc_probe.id = pmc_build.id)
+         ->  Seq Scan on pmc_probe (actual rows=15000 loops=1)
+         ->  Hash (actual rows=10000 loops=1)
+               Buckets: 16384  Batches: 1  Memory Usage: 480kB
+               ->  Seq Scan on pmc_build (actual rows=10000 loops=1)
+(7 rows)
+
+psql:/build/contrib/halo_pmc/demo.sql:18: INFO:  halo_pmc: mode=read scope=hash_build_loop event=instructions raw=8439582 scaled=8439582 enabled_ns=744480 running_ns=744480
+psql:/build/contrib/halo_pmc/demo.sql:18: INFO:  halo_pmc: mode=read scope=hash_build_loop event=cycles raw=2123877 scaled=2123877 enabled_ns=736849 running_ns=736849
+psql:/build/contrib/halo_pmc/demo.sql:18: INFO:  halo_pmc: mode=read scope=hash_build_loop event=perf_count_hw_cache_l1d_rd raw=2713786 scaled=2713786 enabled_ns=733890 running_ns=733890
+psql:/build/contrib/halo_pmc/demo.sql:18: INFO:  halo_pmc: mode=read scope=hash_build_loop event=perf_count_hw_cache_l1d_miss_rd raw=22836 scaled=22836 enabled_ns=756958 running_ns=756958
+ baseline
+----------
+    10000
+(1 row)
+
+SET
+SET
+psql:/build/contrib/halo_pmc/demo.sql:22: INFO:  halo_pmc: mode=rdpmc scope=hash_insert event=instructions raw=3583325 samples=10000 skipped=0
+psql:/build/contrib/halo_pmc/demo.sql:22: INFO:  halo_pmc: mode=rdpmc scope=hash_insert event=cycles raw=2445099 samples=10000 skipped=0
+ low_overhead
+--------------
+        10000
+(1 row)
+
+RESET
+ reset
+-------
+ 10000
+(1 row)
+

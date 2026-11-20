@@ -23,6 +23,8 @@
 
 #include "postgres.h"
 
+#include "utils/halo_pmc.h"
+
 #include <math.h>
 #include <limits.h>
 
@@ -61,6 +63,7 @@ static HashJoinTuple ExecParallelHashTupleAlloc(HashJoinTable hashtable,
 												size_t size,
 												dsa_pointer *shared);
 static void MultiExecPrivateHash(HashState *node);
+static void MultiExecPrivateHashLoop(HashState *node, HaloPmc *pmc);
 static void MultiExecParallelHash(HashState *node);
 static inline HashJoinTuple ExecParallelHashFirstTuple(HashJoinTable hashtable,
 													   int bucketno);
@@ -138,6 +141,42 @@ MultiExecHash(HashState *node)
 static void
 MultiExecPrivateHash(HashState *node)
 {
+	HashJoinTable hashtable = node->hashtable;
+	HaloPmc *pmc = HaloPmcOpen();
+
+	if (pmc == NULL)
+		MultiExecPrivateHashLoop(node, NULL);
+	else
+	{
+		PG_TRY();
+		{
+			bool sample = HaloPmcStart(pmc);
+
+			MultiExecPrivateHashLoop(node, sample ? pmc : NULL);
+			HaloPmcReport(pmc);
+		}
+		PG_FINALLY();
+		{
+			HaloPmcClose(pmc);
+		}
+		PG_END_TRY();
+	}
+
+	/* resize the hash table if needed (NTUP_PER_BUCKET exceeded) */
+	if (hashtable->nbuckets != hashtable->nbuckets_optimal)
+		ExecHashIncreaseNumBuckets(hashtable);
+
+	/* Account for the buckets in spaceUsed (reported in EXPLAIN ANALYZE) */
+	hashtable->spaceUsed += hashtable->nbuckets * sizeof(HashJoinTuple);
+	if (hashtable->spaceUsed > hashtable->spacePeak)
+		hashtable->spacePeak = hashtable->spaceUsed;
+
+	hashtable->partialTuples = hashtable->totalTuples;
+}
+
+static void
+MultiExecPrivateHashLoop(HashState *node, HaloPmc *pmc)
+{
 	PlanState  *outerNode;
 	List	   *hashkeys;
 	HashJoinTable hashtable;
@@ -174,6 +213,9 @@ MultiExecPrivateHash(HashState *node)
 		{
 			int			bucketNumber;
 
+			if (pmc != NULL)
+				HaloPmcSampleStart(pmc);
+
 			bucketNumber = ExecHashGetSkewBucket(hashtable, hashvalue);
 			if (bucketNumber != INVALID_SKEW_BUCKET_NO)
 			{
@@ -187,21 +229,13 @@ MultiExecPrivateHash(HashState *node)
 				/* Not subject to skew optimization, so insert normally */
 				ExecHashTableInsert(hashtable, slot, hashvalue);
 			}
+			if (pmc != NULL)
+				HaloPmcSampleEnd(pmc);
 			hashtable->totalTuples += 1;
 		}
 	}
-
-	/* resize the hash table if needed (NTUP_PER_BUCKET exceeded) */
-	if (hashtable->nbuckets != hashtable->nbuckets_optimal)
-		ExecHashIncreaseNumBuckets(hashtable);
-
-	/* Account for the buckets in spaceUsed (reported in EXPLAIN ANALYZE) */
-	hashtable->spaceUsed += hashtable->nbuckets * sizeof(HashJoinTuple);
-	if (hashtable->spaceUsed > hashtable->spacePeak)
-		hashtable->spacePeak = hashtable->spaceUsed;
-
-	hashtable->partialTuples = hashtable->totalTuples;
 }
+
 
 /* ----------------------------------------------------------------
  *		MultiExecParallelHash

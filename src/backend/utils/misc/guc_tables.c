@@ -78,6 +78,7 @@
 #include "utils/float.h"
 #include "utils/guc_hooks.h"
 #include "utils/guc_tables.h"
+#include "utils/halo_pmc.h"
 #include "utils/memutils.h"
 #include "utils/pg_locale.h"
 #include "utils/portal.h"
@@ -1837,6 +1838,16 @@ struct config_bool ConfigureNamesBool[] =
 		NULL, NULL, NULL
 	},
 
+	{
+		{"halo_pmc_rdpmc", PGC_SUSET, DEVELOPER_OPTIONS,
+			gettext_noop("Uses RDPMC snapshots for individual hash insertions when available."),
+			NULL,
+			GUC_NOT_IN_SAMPLE
+		},
+		&halo_pmc_rdpmc,
+		false,
+		NULL, NULL, NULL
+	},
 	{
 		{"allow_in_place_tablespaces", PGC_SUSET, DEVELOPER_OPTIONS,
 			gettext_noop("Allows tablespaces directly inside pg_tblspc, for testing."),
@@ -3805,6 +3816,17 @@ struct config_real ConfigureNamesReal[] =
 
 struct config_string ConfigureNamesString[] =
 {
+	{
+		{"halo_pmc_list", PGC_SUSET, DEVELOPER_OPTIONS,
+			gettext_noop("Selects CPU events for backend-private hash builds."),
+			gettext_noop("A comma-separated list of names from pg_catalog.pmc_name."),
+			GUC_NOT_IN_SAMPLE
+		},
+		&halo_pmc_list,
+		"",
+		NULL, NULL, NULL
+	},
+
 	{
 		{"archive_command", PGC_SIGHUP, WAL_ARCHIVING,
 			gettext_noop("Sets the shell command that will be called to archive a WAL file."),
